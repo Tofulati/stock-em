@@ -1,0 +1,11 @@
+numpy
+pandas
+pyarrow
+yfinance
+scikit-learn
+torch
+transformers
+sentence-transformers
+newspaper3k
+matplotlib
+vectorbt
