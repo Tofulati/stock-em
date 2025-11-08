@@ -137,7 +137,7 @@ def make_advanced_features(df):
     # Autocorrelation (momentum persistence)
     df['ret_autocorr5'] = df['ret1'].rolling(20).apply(lambda x: pd.Series(x).autocorr(5), raw=False)
     
-   # ============ Time-based Features ============
+    # ============ Time-based Features ============
     try:
         if 'date' in df.columns:
             date_col = pd.to_datetime(df['date'])

@@ -68,7 +68,7 @@ def train_model_with_validation(model, train_loader, val_loader, loss_fn, device
     )
     
     best_val_loss = np.inf
-    best_model_state = None
+    best_model_state = model.state_dict()  # Initialize with current state
     counter = 0
     history = {'train_loss': [], 'val_loss': []}
     
@@ -84,7 +84,23 @@ def train_model_with_validation(model, train_loader, val_loader, loss_fn, device
             
             optimizer.zero_grad()
             pred_ret, action_logits, confidence = model(xb)
+            
+            # Check for NaN in predictions
+            if torch.isnan(pred_ret).any() or torch.isnan(action_logits).any():
+                print(f"Warning: NaN detected in predictions at epoch {epoch}")
+                print(f"  pred_ret has NaN: {torch.isnan(pred_ret).any()}")
+                print(f"  action_logits has NaN: {torch.isnan(action_logits).any()}")
+                print(f"  Input stats - min: {xb.min():.4f}, max: {xb.max():.4f}, mean: {xb.mean():.4f}")
+                # Skip this batch
+                continue
+            
             loss, loss_dict = loss_fn(pred_ret, action_logits, confidence, y_ret, y_act)
+            
+            # Check for NaN loss
+            if torch.isnan(loss):
+                print(f"Warning: NaN loss at epoch {epoch}, skipping batch")
+                continue
+            
             loss.backward()
             
             # Gradient clipping
@@ -92,6 +108,10 @@ def train_model_with_validation(model, train_loader, val_loader, loss_fn, device
             
             optimizer.step()
             train_losses.append(loss.item())
+        
+        if len(train_losses) == 0:
+            print(f"Error: All batches had NaN at epoch {epoch}. Stopping training.")
+            break
         
         avg_train_loss = np.mean(train_losses)
         
@@ -106,8 +126,19 @@ def train_model_with_validation(model, train_loader, val_loader, loss_fn, device
                 y_act = y_act.to(device)
                 
                 pred_ret, action_logits, confidence = model(xb)
+                
+                # Skip if NaN
+                if torch.isnan(pred_ret).any() or torch.isnan(action_logits).any():
+                    continue
+                
                 loss, _ = loss_fn(pred_ret, action_logits, confidence, y_ret, y_act)
-                val_losses.append(loss.item())
+                
+                if not torch.isnan(loss):
+                    val_losses.append(loss.item())
+        
+        if len(val_losses) == 0:
+            print(f"Error: All validation batches had NaN at epoch {epoch}. Stopping training.")
+            break
         
         avg_val_loss = np.mean(val_losses)
         history['train_loss'].append(avg_train_loss)
@@ -242,9 +273,72 @@ def improved_pipeline(
     feature_cols = [f for f in feature_cols if f in df.columns]
     print(f"  Using {len(feature_cols)} features")
     
+    # === DATA QUALITY CHECKS ===
+    print("\n  Data quality checks:")
+    
+    # Check for infinite values
+    inf_counts = {}
+    for col in feature_cols:
+        inf_count = np.isinf(df[col]).sum()
+        if inf_count > 0:
+            inf_counts[col] = inf_count
+    
+    if inf_counts:
+        print(f"  ⚠️  Found infinite values in {len(inf_counts)} features:")
+        for col, count in list(inf_counts.items())[:5]:
+            print(f"      {col}: {count} inf values")
+    
+    # Check for NaN values before scaling
+    nan_counts = {}
+    for col in feature_cols:
+        nan_count = df[col].isna().sum()
+        if nan_count > 0:
+            nan_counts[col] = nan_count
+    
+    if nan_counts:
+        print(f"  ⚠️  Found NaN values in {len(nan_counts)} features:")
+        for col, count in list(nan_counts.items())[:5]:
+            print(f"      {col}: {count} NaN values")
+    
+    # Replace infinite values with NaN
+    df[feature_cols] = df[feature_cols].replace([np.inf, -np.inf], np.nan)
+    
+    # Fill NaN values using forward fill, then backward fill, then zero
+    df[feature_cols] = df[feature_cols].ffill().bfill().fillna(0)
+    
+    # Check if any NaN remain
+    remaining_nan = df[feature_cols].isna().sum().sum()
+    if remaining_nan > 0:
+        print(f"  ⚠️  WARNING: {remaining_nan} NaN values remain after filling!")
+        df[feature_cols] = df[feature_cols].fillna(0)
+    else:
+        print(f"  ✓ No NaN values after cleaning")
+    
+    # Check for extreme values before scaling
+    print("\n  Feature value ranges (before scaling):")
+    for col in feature_cols[:5]:  # Show first 5
+        min_val = df[col].min()
+        max_val = df[col].max()
+        mean_val = df[col].mean()
+        print(f"      {col:20s}: [{min_val:>10.4f}, {max_val:>10.4f}] mean={mean_val:>10.4f}")
+    
     # Robust scaling (better for financial data with outliers)
     scaler = RobustScaler()
     df[feature_cols] = scaler.fit_transform(df[feature_cols])
+    
+    # Final sanity check after scaling
+    print("\n  After scaling:")
+    has_nan = df[feature_cols].isna().any().any()
+    has_inf = np.isinf(df[feature_cols].values).any()
+    print(f"    Has NaN: {has_nan}")
+    print(f"    Has Inf: {has_inf}")
+    
+    if has_nan or has_inf:
+        print("  ⚠️  ERROR: Still have NaN/Inf after scaling! Clipping to [-10, 10]")
+        df[feature_cols] = df[feature_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+        df[feature_cols] = df[feature_cols].clip(-10, 10)
+    else:
+        print("  ✓ Data is clean and ready for training")
     
     # ========== 7. Build sequences ==========
     print("\nStep 7: Building sequences...")
@@ -295,19 +389,21 @@ def improved_pipeline(
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"  Device: {device}")
     
+    # Use smaller model to reduce NaN risk
     model = AdvancedLSTM(
         input_size=X.shape[2],
-        hidden_size=128,
-        num_layers=3,
-        num_heads=4,
-        dropout=0.3
+        hidden_size=64,  # Reduced from 128
+        num_layers=2,    # Reduced from 3
+        num_heads=2,     # Reduced from 4
+        dropout=0.2      # Reduced from 0.3
     ).to(device)
     
-    loss_fn = CombinedLoss(alpha=1.0, beta=0.5, gamma=0.3)
+    # Reduce loss weights to prevent instability
+    loss_fn = CombinedLoss(alpha=1.0, beta=0.3, gamma=0.1)
     
     model, history = train_model_with_validation(
         model, train_loader, val_loader, loss_fn, device,
-        epochs=epochs, patience=15, lr=1e-3
+        epochs=epochs, patience=15, lr=5e-4  # Lower learning rate
     )
     
     # ========== 10. Generate predictions on test set ==========
@@ -390,7 +486,7 @@ def improved_pipeline(
 if __name__ == '__main__':
     # Run pipeline
     results = improved_pipeline(
-        ticker='AAPL',
+        ticker='INTC',
         period='5y',
         seq_len=30,
         batch_size=64,
