@@ -486,7 +486,7 @@ def improved_pipeline(
 if __name__ == '__main__':
     # Run pipeline
     results = improved_pipeline(
-        ticker='INTC',
+        ticker='MSFT',
         period='5y',
         seq_len=30,
         batch_size=64,

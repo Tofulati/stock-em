@@ -66,31 +66,33 @@ class AdvancedBacktest:
                         shares = 0.0
                         entry_price = None
                         position_type = None
-                        print(f"[{date}] STOP LOSS triggered (long) at {stop_price:.2f}")
+                        # print(f"[{date}] STOP LOSS triggered (long) at {stop_price:.2f}")
                         
                 elif position_type == 'short':
                     # Stop loss for short: if price rises above entry + stop_loss_pct
                     if high_price > entry_price * (1 + self.stop_loss_pct):
                         # Close short position at stop price
                         stop_price = entry_price * (1 + self.stop_loss_pct)
-                        cost = -shares * stop_price * (1 + self.transaction_cost)
-                        cash += cost  # cost is negative for short closing
+                        # For shorts: we need to buy back shares at higher price (loss)
+                        cost = abs(shares) * stop_price * (1 + self.transaction_cost)
+                        cash -= cost
                         shares = 0.0
                         entry_price = None
                         position_type = None
-                        print(f"[{date}] STOP LOSS triggered (short) at {stop_price:.2f}")
+                        # print(f"[{date}] STOP LOSS triggered (short) at {stop_price:.2f}")
             
             # Trading logic based on signal
             if signal > 0:  # BUY/LONG signal
                 if shares < 0:  # Close short position first
-                    cost = -shares * open_price * (1 + self.transaction_cost)
-                    cash += cost
+                    # To close short: buy back shares
+                    cost = abs(shares) * open_price * (1 + self.transaction_cost)
+                    cash -= cost
                     shares = 0.0
                     entry_price = None
                     position_type = None
                 
                 # Open or add to long position
-                if shares == 0:
+                if shares == 0 and cash > 0:
                     # Position sizing based on confidence
                     position_value = cash * self.max_position_pct * conf
                     new_shares = position_value / open_price
@@ -120,27 +122,30 @@ class AdvancedBacktest:
                         entry_price = None
                         position_type = None
                     
-                    # Open or add to short position
-                    if shares == 0:
-                        # Short position sizing
+                    # Open short position (limited by available cash as collateral)
+                    if shares == 0 and cash > 0:
+                        # Short position sizing (use cash as collateral)
                         position_value = cash * self.max_position_pct * conf
-                        new_shares = -(position_value / open_price)  # negative for short
+                        new_shares = position_value / open_price
                         
-                        # For short, we receive cash
-                        proceeds = -new_shares * open_price * (1 - self.transaction_cost)
+                        # For short: we receive cash from selling borrowed shares
+                        # But we need collateral, so track shares as negative
+                        proceeds = new_shares * open_price * (1 - self.transaction_cost)
                         cash += proceeds
-                        shares = new_shares
+                        shares = -new_shares  # Negative = short
                         entry_price = open_price
                         position_type = 'short'
                         
             elif signal == 0:  # HOLD/NEUTRAL - close all positions
-                if shares != 0:
-                    if shares > 0:  # Close long
-                        proceeds = shares * open_price * (1 - self.transaction_cost)
-                        cash += proceeds
-                    else:  # Close short
-                        cost = -shares * open_price * (1 + self.transaction_cost)
-                        cash += cost
+                if shares > 0:  # Close long
+                    proceeds = shares * open_price * (1 - self.transaction_cost)
+                    cash += proceeds
+                    shares = 0.0
+                    entry_price = None
+                    position_type = None
+                elif shares < 0:  # Close short
+                    cost = abs(shares) * open_price * (1 + self.transaction_cost)
+                    cash -= cost
                     shares = 0.0
                     entry_price = None
                     position_type = None
@@ -148,20 +153,21 @@ class AdvancedBacktest:
             # Calculate NAV (Net Asset Value)
             if shares > 0:  # Long position
                 position_value = shares * close_price
+                nav = cash + position_value
             elif shares < 0:  # Short position
-                # For short: we owe shares, so negative position
-                position_value = shares * close_price
+                # For short: NAV = cash - (current value of borrowed shares)
+                # When we shorted, we got cash. Now we owe shares worth current price.
+                borrowed_value = abs(shares) * close_price
+                nav = cash - borrowed_value
             else:
-                position_value = 0
-            
-            nav = cash + position_value
+                nav = cash
             
             history.append({
                 'date': date,
                 'cash': cash,
                 'shares': shares,
                 'position_type': position_type if shares != 0 else 'none',
-                'position_value': position_value,
+                'position_value': shares * close_price if shares != 0 else 0,
                 'nav': nav,
                 'signal': signal,
                 'confidence': conf
