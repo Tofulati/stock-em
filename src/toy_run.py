@@ -486,11 +486,11 @@ def improved_pipeline(
 if __name__ == '__main__':
     # Run pipeline
     results = improved_pipeline(
-        ticker='MSFT',
-        period='5y',
+        ticker='RDDT',
+        period='1y',       #1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, ytd, max
         seq_len=30,
         batch_size=64,
         epochs=150,
         enable_news=False,  # Set to True if you have real news data
-        enable_shorting=True
+        enable_shorting=False
     )
