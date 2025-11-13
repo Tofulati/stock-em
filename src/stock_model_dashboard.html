@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Backtest Dashboard - File Upload</title>
+    <!-- Chart.js for visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <style>
+        /* General Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background-color: #1f2937; /* Slate-800 equivalent */
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            padding: 30px;
+            transition: opacity 0.3s;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #e0f2f1;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+        }
+        
+        #metadata {
+            text-align: center; 
+            color: #9ca3af; 
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        /* Initial State / File Drop Zone */
+        #initial-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 50vh;
+            border: 3px dashed #6366f1;
+            border-radius: 12px;
+            background-color: #374151;
+            padding: 40px;
+            text-align: center;
+        }
+
+        #file-input-label {
+            background-color: #6366f1;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: background-color 0.2s;
+            box-shadow: 0 4px #4f46e5;
+        }
+
+        #file-input-label:hover {
+            background-color: #4f46e5;
+        }
+
+        #jsonFileInput {
+            display: none;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background-color: #374151;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #6366f1;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-title {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .stat-pnl.positive { color: #22c55e; }
+        .stat-pnl.negative { color: #ef4444; }
+        .stat-win-rate { color: #3b82f6; }
+        .stat-total-trades { color: #f59e0b; }
+        .stat-avg-conf { color: #a855f7; }
+
+
+        /* Chart Section */
+        .chart-section {
+            background-color: #374151;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Trade Table */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .trade-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background-color: #374151;
+        }
+
+        .trade-table th, .trade-table td {
+            padding: 12px 15px;
+            text-align: left;
+        }
+
+        .trade-table th {
+            background-color: #1f2937;
+            color: #9ca3af;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .trade-table tbody tr {
+            border-bottom: 1px solid #4b5563;
+        }
+
+        .signal-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .signal-badge.buy { background-color: #22c55e; color: #1f2937; }
+        .signal-badge.sell { background-color: #ef4444; color: #1f2937; }
+        .signal-badge.none { background-color: #9ca3af; color: #1f2937; }
+        .pnl-value { font-weight: 600; } /* Added class for PnL in table */
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 1.75rem;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <!-- Initial State: File Upload Interface -->
+        <div id="initial-state">
+            <h1>Upload Your Backtest Results</h1>
+            <p style="color: #cbd5e1;">Please upload the JSON file generated by your trading model pipeline.</p>
+            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 10px;">The JSON file should contain 'metrics' and 'backtest' arrays.</p>
+
+            <input type="file" id="jsonFileInput" accept=".json" onchange="handleFileUpload(event)">
+            <label for="jsonFileInput" id="file-input-label">Select JSON File</label>
+            <p id="file-status" style="margin-top: 15px; color: #f59e0b;"></p>
+        </div>
+
+        <!-- Dashboard Content (Hidden until file is loaded) -->
+        <div id="dashboardContent" style="display: none; opacity: 0;">
+            <h1>Model Backtest Results</h1>
+            <p id="metadata">Ticker: <span id="tickerSymbol">...</span> | Period: <span id="backtestPeriod">...</span> | Strategy: <span id="strategyType">...</span></p>
+
+            <!-- Summary Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-title">Total PnL</div>
+                    <div id="totalPnl" class="stat-value stat-pnl">...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Total Return (%)</div>
+                    <div id="totalReturn" class="stat-value stat-win-rate">...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Total Trades Executed</div>
+                    <div id="totalTrades" class="stat-value stat-total-trades">...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Sharpe Ratio</div>
+                    <div id="sharpeRatio" class="stat-value stat-avg-conf">...</div>
+                </div>
+            </div>
+
+            <!-- Performance Chart -->
+            <div class="chart-section">
+                <h2 style="font-size: 1.5rem; margin-bottom: 15px; color: #e5e7eb;">Cumulative PnL Trend (NAV)</h2>
+                <canvas id="performanceChart" style="max-height: 400px;"></canvas>
+            </div>
+
+            <!-- Trade History Table -->
+            <h2 style="font-size: 1.5rem; margin-bottom: 15px; color: #e5e7eb;">Trade Signal Events (Daily PnL)</h2>
+
+            <div class="table-wrapper">
+                <table class="trade-table">
+                    <thead>
+                        <tr>
+                            <th>Day Index</th>
+                            <th>Signal</th>
+                            <th>Position Value ($)</th>
+                            <th>Confidence (%)</th>
+                            <th>Shares Held</th>
+                            <th>Daily PnL ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradeHistoryBody">
+                        <tr><td colspan="6" style="text-align: center;">Waiting for data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="noDataMessage" style="text-align: center; padding: 20px; color: #9ca3af; display: none;">No signal events found (only 'NONE').</div>
+        </div>
+    </div>
+
+    <script>
+        const INITIAL_CAPITAL = 10000.0;
+        let performanceChart; // Global Chart instance
+
+        /**
+         * Maps numerical signal to string representation.
+         * @param {number} signal - The model's signal (-1, 0, 1).
+         * @returns {string} Signal name ('BUY', 'SELL', 'NONE').
+         */
+        function getSignalName(signal) {
+            if (signal === 1) return 'BUY';
+            if (signal === -1) return 'SELL';
+            return 'NONE';
+        }
+
+        /**
+         * Parses the uploaded JSON file and initializes the dashboard.
+         * @param {Event} event - The file input change event.
+         */
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            const statusElement = document.getElementById('file-status');
+            
+            if (!file) {
+                statusElement.textContent = 'No file selected.';
+                return;
+            }
+
+            statusElement.textContent = `Loading file: ${file.name}...`;
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.metrics || !data.backtest || !Array.isArray(data.backtest)) {
+                        throw new Error("JSON structure is invalid. Requires 'metrics' and 'backtest' fields.");
+                    }
+                    statusElement.textContent = `Successfully loaded ${file.name}. Initializing dashboard...`;
+                    initializeDashboard(data);
+                } catch (error) {
+                    console.error("File processing error:", error);
+                    statusElement.textContent = `Error: ${error.message}. Please upload a valid JSON file.`;
+                    document.getElementById('dashboardContent').style.display = 'none';
+                    document.getElementById('initial-state').style.display = 'flex';
+                }
+            };
+            
+            reader.onerror = function() {
+                statusElement.textContent = 'Error reading file.';
+            };
+
+            reader.readAsText(file);
+        }
+
+        /**
+         * Calculates and displays summary statistics from the metrics object.
+         * @param {Object} metrics - The overall performance metrics.
+         * @param {Object} data - The entire data object for context.
+         */
+        function updateSummaryStats(metrics, data) {
+            const totalPnL = metrics["Final NAV"] - INITIAL_CAPITAL;
+
+            document.getElementById('tickerSymbol').textContent = data.ticker || 'N/A';
+            document.getElementById('backtestPeriod').textContent = data.period || 'N/A';
+            document.getElementById('strategyType').textContent = data.use_ensemble ? 'Ensemble' : 'Single Model';
+            
+            document.getElementById('totalPnl').textContent = `$${totalPnL.toFixed(2)}`;
+            document.getElementById('totalPnl').className = `stat-value stat-pnl ${totalPnL >= 0 ? 'positive' : 'negative'}`;
+
+            document.getElementById('totalReturn').textContent = `${metrics["Total Return (%)"].toFixed(2)}%`;
+            document.getElementById('totalTrades').textContent = metrics["Number of Trades"].toString();
+            document.getElementById('sharpeRatio').textContent = metrics["Sharpe Ratio"].toFixed(3);
+        }
+
+        /**
+         * Initializes or updates the cumulative PnL chart using daily NAV data.
+         * @param {Array} backtestData - The array of daily backtest snapshots.
+         */
+        function renderChart(backtestData) {
+            const dates = backtestData.map(entry => `Day ${entry.date}`);
+            // PnL data is the difference between current NAV and initial capital
+            const pnlData = backtestData.map(entry => entry.nav - INITIAL_CAPITAL); 
+
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+
+            if (performanceChart) {
+                performanceChart.data.labels = dates;
+                performanceChart.data.datasets[0].data = pnlData;
+                performanceChart.update();
+            } else {
+                performanceChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: `Cumulative PnL (vs $${INITIAL_CAPITAL.toFixed(0)} initial capital)`,
+                            data: pnlData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, labels: { color: '#e5e7eb' } },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: (context) => {
+                                        let label = context.dataset.label || '';
+                                        if (context.parsed.y !== null) {
+                                            label = `PnL: $${context.parsed.y.toFixed(2)}`;
+                                        }
+                                        return label;
+                                    },
+                                    title: (items) => items[0].label
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { title: { display: true, text: 'Day Index', color: '#9ca3af' }, ticks: { color: '#e5e7eb', maxRotation: 45, minRotation: 45 }, grid: { color: '#4b5563' } },
+                            y: {
+                                title: { display: true, text: 'PnL ($)', color: '#9ca3af' },
+                                ticks: {
+                                    color: '#e5e7eb',
+                                    callback: (value) => value >= 0 ? `+$${value.toFixed(0)}` : `-$${Math.abs(value).toFixed(0)}`
+                                },
+                                grid: { color: '#4b5563' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        /**
+         * Renders the trade history table, focusing on signal events and calculating Daily PnL.
+         * @param {Array} backtestData - The array of daily backtest snapshots.
+         */
+        function renderTable(backtestData) {
+            const tbody = document.getElementById('tradeHistoryBody');
+            const noDataMessage = document.getElementById('noDataMessage');
+
+            tbody.innerHTML = ''; 
+            let hasSignalEvents = false;
+
+            // Iterate over the full backtest data
+            for (let i = 0; i < backtestData.length; i++) {
+                const entry = backtestData[i];
+                
+                // Only render rows for signal events (BUY or SELL)
+                if (entry.signal !== 0) {
+                    hasSignalEvents = true;
+
+                    // Calculate daily PnL: Current NAV minus Previous NAV
+                    const previousNav = i > 0 ? backtestData[i - 1].nav : INITIAL_CAPITAL;
+                    const dailyPnL = entry.nav - previousNav;
+                    
+                    const signalName = getSignalName(entry.signal);
+                    const signalClass = signalName.toLowerCase();
+                    const pnlClass = dailyPnL >= 0 ? 'positive' : 'negative';
+
+                    const row = `
+                        <tr>
+                            <td>Day ${entry.date}</td>
+                            <td><span class="signal-badge ${signalClass}">${signalName}</span></td>
+                            <td>$${entry.position_value.toFixed(2)}</td>
+                            <td>${(entry.confidence * 100).toFixed(2)}%</td>
+                            <td>${entry.shares.toFixed(2)}</td>
+                            <td><span class="pnl-value stat-pnl ${pnlClass}">$${dailyPnL.toFixed(2)}</span></td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                }
+            }
+
+            if (!hasSignalEvents) {
+                // If no signal events, show the 'No Data' message
+                noDataMessage.style.display = 'block';
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">No signal events found (only 'NONE').</td></tr>`;
+            } else {
+                noDataMessage.style.display = 'none';
+            }
+        }
+
+        /**
+         * Main function to initialize the dashboard with parsed data.
+         * @param {Object} data - The parsed model results object.
+         */
+        function initializeDashboard(data) {
+            // Check for required data integrity
+            if (!data || !data.metrics || !data.backtest) {
+                console.error("Invalid data structure provided to initializeDashboard.");
+                document.getElementById('file-status').textContent = 'Error: Invalid data structure.';
+                return;
+            }
+
+            // Update DOM with data
+            updateSummaryStats(data.metrics, data);
+            renderChart(data.backtest);
+            renderTable(data.backtest);
+
+            // Hide the file upload state and show the dashboard content with a fade effect
+            const initialState = document.getElementById('initial-state');
+            const dashboardContent = document.getElementById('dashboardContent');
+
+            initialState.style.display = 'none';
+            dashboardContent.style.display = 'block';
+            setTimeout(() => {
+                dashboardContent.style.opacity = '1';
+            }, 50); // Small delay for transition
+        }
+
+        // On load, ensure we are in the file upload state.
+        window.onload = function() {
+            document.getElementById('dashboardContent').style.display = 'none';
+            document.getElementById('initial-state').style.display = 'flex';
+        };
+    </script>
+</body>
+</html>
