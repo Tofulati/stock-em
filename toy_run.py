@@ -564,7 +564,7 @@ def improved_pipeline_with_ensemble(
     
     # 14. Plot results
     print("\nStep 14: Generating plots...")
-    backtester.plot_results(bt_results, ticker=ticker)
+    # backtester.plot_results(bt_results, ticker=ticker)
     
     # Plot training history
     # fig, ax = plt.subplots(figsize=(10, 5))
@@ -607,7 +607,7 @@ if __name__ == '__main__':
         batch_size=64,
         epochs=150,
         use_ensemble=True, 
-        test_live=True, 
+        test_live=False, 
         enable_shorting=True,
         export_results=True
     )
