@@ -9,3 +9,5 @@ sentence-transformers
 newspaper3k
 matplotlib
 vectorbt
+flask
+flask-cors

@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import yfinance as yf
-from .config import DATA_DIR, TICKERS
+from config import DATA_DIR, TICKERS
 
 os.makedirs(DATA_DIR, exist_ok=True)
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Model Backtest Dashboard - File Upload</title>
+    <title>Model Backtest Dashboard - Interactive</title>
     <!-- Chart.js for visualization -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
@@ -25,7 +25,7 @@
         .dashboard-container {
             max-width: 1300px;
             margin: 0 auto;
-            background-color: #1f2937; /* Slate-800 equivalent */
+            background-color: #1f2937;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
             padding: 30px;
@@ -54,12 +54,110 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 50vh;
+            min-height: 50vh;
             border: 3px dashed #6366f1;
             border-radius: 12px;
             background-color: #374151;
             padding: 40px;
             text-align: center;
+        }
+
+        .option-divider {
+            width: 100%;
+            text-align: center;
+            margin: 30px 0;
+            color: #9ca3af;
+            position: relative;
+        }
+
+        .option-divider::before,
+        .option-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: #4b5563;
+        }
+
+        .option-divider::before { left: 0; }
+        .option-divider::after { right: 0; }
+
+        .ticker-input-section {
+            width: 100%;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+
+        .ticker-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            color: #cbd5e1;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px;
+            border-radius: 6px;
+            border: 2px solid #4b5563;
+            background-color: #1f2937;
+            color: #fff;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+            font-size: 1rem;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-primary {
+            background-color: #6366f1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-success {
+            background-color: #22c55e;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #16a34a;
+        }
+
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
         }
 
         #file-input-label {
@@ -72,6 +170,7 @@
             margin-top: 20px;
             transition: background-color 0.2s;
             box-shadow: 0 4px #4f46e5;
+            display: inline-block;
         }
 
         #file-input-label:hover {
@@ -80,6 +179,52 @@
 
         #jsonFileInput {
             display: none;
+        }
+
+        /* Loading Animation */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid #4b5563;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            color: #cbd5e1;
+        }
+
+        .loading-steps {
+            margin-top: 15px;
+            color: #9ca3af;
+            font-size: 0.9rem;
+            text-align: center;
+            max-width: 400px;
         }
 
         /* Stats Cards */
@@ -116,7 +261,6 @@
         .stat-win-rate { color: #3b82f6; }
         .stat-total-trades { color: #f59e0b; }
         .stat-avg-conf { color: #a855f7; }
-
 
         /* Chart Section */
         .chart-section {
@@ -174,7 +318,14 @@
         .signal-badge.buy { background-color: #22c55e; color: #1f2937; }
         .signal-badge.sell { background-color: #ef4444; color: #1f2937; }
         .signal-badge.none { background-color: #9ca3af; color: #1f2937; }
-        .pnl-value { font-weight: 600; } /* Added class for PnL in table */
+        .pnl-value { font-weight: 600; }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -192,16 +343,80 @@
 </head>
 <body>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Running Backtest...</div>
+        <div class="loading-steps" id="loadingSteps">
+            Initializing pipeline...
+        </div>
+    </div>
+
     <div class="dashboard-container">
         <!-- Initial State: File Upload Interface -->
         <div id="initial-state">
-            <h1>Upload Your Backtest Results</h1>
-            <p style="color: #cbd5e1;">Please upload the JSON file generated by your trading model pipeline.</p>
-            <p style="color: #9ca3af; font-size: 0.9rem; margin-top: 10px;">The JSON file should contain 'metrics' and 'backtest' arrays.</p>
+            <h1>Trading Model Backtest Dashboard</h1>
+            <p style="color: #cbd5e1; margin-bottom: 10px;">Run a new backtest or upload existing results</p>
 
-            <input type="file" id="jsonFileInput" accept=".json" onchange="handleFileUpload(event)">
-            <label for="jsonFileInput" id="file-input-label">Select JSON File</label>
-            <p id="file-status" style="margin-top: 15px; color: #f59e0b;"></p>
+            <!-- Option 1: Run New Backtest -->
+            <div class="ticker-input-section">
+                <h3 style="color: #e5e7eb; margin-bottom: 15px;">🚀 Run New Backtest</h3>
+                <form class="ticker-form" onsubmit="runBacktest(event)">
+                    <div class="form-group">
+                        <label for="tickerInput">Stock Ticker Symbol</label>
+                        <input 
+                            type="text" 
+                            id="tickerInput" 
+                            placeholder="e.g., AAPL, MSFT, TSLA"
+                            required
+                            pattern="[A-Za-z]{1,5}"
+                            title="Enter a valid stock ticker (1-5 letters)"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="periodSelect">Time Period</label>
+                        <select id="periodSelect">
+                            <option value="1y">1 Year</option>
+                            <option value="2y">2 Years</option>
+                            <option value="5y" selected>5 Years</option>
+                            <option value="10y">10 Years</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ensembleSelect">Model Type</label>
+                        <select id="ensembleSelect">
+                            <option value="true">Ensemble (LSTM + GRU + Transformer)</option>
+                            <option value="false">Single LSTM</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        Run Backtest
+                    </button>
+                </form>
+            </div>
+
+            <div class="option-divider">OR</div>
+
+            <!-- Option 2: Upload File -->
+            <div>
+                <h3 style="color: #e5e7eb; margin-bottom: 15px;">📁 Upload Existing Results</h3>
+                <p style="color: #9ca3af; font-size: 0.9rem; margin-bottom: 15px;">
+                    Upload a JSON file from a previous backtest run
+                </p>
+                <input type="file" id="jsonFileInput" accept=".json" onchange="handleFileUpload(event)">
+                <label for="jsonFileInput" id="file-input-label">Select JSON File</label>
+            </div>
+
+            <div class="action-buttons">
+                <button id="watchButton" onclick="toggleWatch()" class="btn btn-success">
+                    Watch for New Results
+                </button>
+            </div>
+
+            <p id="file-status" style="margin-top: 20px; color: #f59e0b;"></p>
         </div>
 
         <!-- Dashboard Content (Hidden until file is loaded) -->
@@ -256,17 +471,23 @@
                 </table>
             </div>
             <div id="noDataMessage" style="text-align: center; padding: 20px; color: #9ca3af; display: none;">No signal events found (only 'NONE').</div>
+
+            <div class="action-buttons">
+                <button onclick="resetDashboard()" class="btn btn-primary">
+                    Run Another Backtest
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
         const INITIAL_CAPITAL = 10000.0;
-        let performanceChart; // Global Chart instance
+        let performanceChart;
+        let watchInterval = null;
+        let isWatching = false;
 
         /**
          * Maps numerical signal to string representation.
-         * @param {number} signal - The model's signal (-1, 0, 1).
-         * @returns {string} Signal name ('BUY', 'SELL', 'NONE').
          */
         function getSignalName(signal) {
             if (signal === 1) return 'BUY';
@@ -275,8 +496,127 @@
         }
 
         /**
+         * Shows loading overlay with progress updates
+         */
+        function showLoading(message = 'Processing...') {
+            document.getElementById('loadingOverlay').classList.add('active');
+            document.getElementById('loadingSteps').textContent = message;
+        }
+
+        /**
+         * Hides loading overlay
+         */
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        /**
+         * Runs the backtest by calling the Flask backend
+         */
+        async function runBacktest(event) {
+            event.preventDefault();
+            
+            const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+            const period = document.getElementById('periodSelect').value;
+            const useEnsemble = document.getElementById('ensembleSelect').value === 'true';
+            
+            if (!ticker) {
+                alert('Please enter a valid ticker symbol');
+                return;
+            }
+
+            showLoading('Initializing backtest pipeline...');
+            
+            try {
+                // Start the backtest
+                const response = await fetch('http://localhost:5000/api/run_backtest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ticker: ticker,
+                        period: period,
+                        use_ensemble: useEnsemble,
+                        epochs: 150
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start backtest. Is the backend server running?');
+                }
+
+                const startData = await response.json();
+                const requestId = startData.request_id;
+                
+                updateLoadingStep('Backtest started. Polling for updates...');
+                
+                // Poll for status updates
+                let completed = false;
+                while (!completed) {
+                    await sleep(2000); // Poll every 2 seconds
+                    
+                    const statusResponse = await fetch(`http://localhost:5000/api/backtest_status/${requestId}`);
+                    const statusData = await statusResponse.json();
+                    
+                    updateLoadingStep(statusData.step || 'Processing...');
+                    
+                    if (statusData.status === 'completed') {
+                        completed = true;
+                        updateLoadingStep('Backtest complete! Loading results...');
+                        await sleep(500);
+                        hideLoading();
+                        
+                        if (statusData.results) {
+                            initializeDashboard(statusData.results);
+                        } else {
+                            throw new Error('No results returned from backtest');
+                        }
+                    } else if (statusData.status === 'error') {
+                        throw new Error(statusData.error || 'Backtest failed');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Backtest error:', error);
+                hideLoading();
+                
+                let errorMessage = error.message;
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Cannot connect to backend server. Please ensure:\n\n1. Flask server is running (python backend.py)\n2. Server is accessible at http://localhost:5000\n3. CORS is enabled\n\nAlternatively, use the file upload option.';
+                }
+                
+                alert('Error running backtest:\n\n' + errorMessage);
+                document.getElementById('file-status').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        /**
+         * Updates the loading step message
+         */
+        function updateLoadingStep(message) {
+            document.getElementById('loadingSteps').textContent = message;
+        }
+
+        /**
+         * Sleep utility for simulating progress
+         */
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        /**
+         * Resets dashboard to initial state
+         */
+        function resetDashboard() {
+            document.getElementById('dashboardContent').style.display = 'none';
+            document.getElementById('initial-state').style.display = 'flex';
+            document.getElementById('tickerInput').value = '';
+            document.getElementById('file-status').textContent = '';
+        }
+
+        /**
          * Parses the uploaded JSON file and initializes the dashboard.
-         * @param {Event} event - The file input change event.
          */
         function handleFileUpload(event) {
             const file = event.target.files[0];
@@ -316,8 +656,6 @@
 
         /**
          * Calculates and displays summary statistics from the metrics object.
-         * @param {Object} metrics - The overall performance metrics.
-         * @param {Object} data - The entire data object for context.
          */
         function updateSummaryStats(metrics, data) {
             const totalPnL = metrics["Final NAV"] - INITIAL_CAPITAL;
@@ -336,11 +674,9 @@
 
         /**
          * Initializes or updates the cumulative PnL chart using daily NAV data.
-         * @param {Array} backtestData - The array of daily backtest snapshots.
          */
         function renderChart(backtestData) {
             const dates = backtestData.map(entry => `Day ${entry.date}`);
-            // PnL data is the difference between current NAV and initial capital
             const pnlData = backtestData.map(entry => entry.nav - INITIAL_CAPITAL); 
 
             const ctx = document.getElementById('performanceChart').getContext('2d');
@@ -401,8 +737,7 @@
         }
 
         /**
-         * Renders the trade history table, focusing on signal events and calculating Daily PnL.
-         * @param {Array} backtestData - The array of daily backtest snapshots.
+         * Renders the trade history table.
          */
         function renderTable(backtestData) {
             const tbody = document.getElementById('tradeHistoryBody');
@@ -411,15 +746,12 @@
             tbody.innerHTML = ''; 
             let hasSignalEvents = false;
 
-            // Iterate over the full backtest data
             for (let i = 0; i < backtestData.length; i++) {
                 const entry = backtestData[i];
                 
-                // Only render rows for signal events (BUY or SELL)
                 if (entry.signal !== 0) {
                     hasSignalEvents = true;
 
-                    // Calculate daily PnL: Current NAV minus Previous NAV
                     const previousNav = i > 0 ? backtestData[i - 1].nav : INITIAL_CAPITAL;
                     const dailyPnL = entry.nav - previousNav;
                     
@@ -442,7 +774,6 @@
             }
 
             if (!hasSignalEvents) {
-                // If no signal events, show the 'No Data' message
                 noDataMessage.style.display = 'block';
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">No signal events found (only 'NONE').</td></tr>`;
             } else {
@@ -452,22 +783,18 @@
 
         /**
          * Main function to initialize the dashboard with parsed data.
-         * @param {Object} data - The parsed model results object.
          */
         function initializeDashboard(data) {
-            // Check for required data integrity
             if (!data || !data.metrics || !data.backtest) {
                 console.error("Invalid data structure provided to initializeDashboard.");
                 document.getElementById('file-status').textContent = 'Error: Invalid data structure.';
                 return;
             }
 
-            // Update DOM with data
             updateSummaryStats(data.metrics, data);
             renderChart(data.backtest);
             renderTable(data.backtest);
 
-            // Hide the file upload state and show the dashboard content with a fade effect
             const initialState = document.getElementById('initial-state');
             const dashboardContent = document.getElementById('dashboardContent');
 
@@ -475,13 +802,71 @@
             dashboardContent.style.display = 'block';
             setTimeout(() => {
                 dashboardContent.style.opacity = '1';
-            }, 50); // Small delay for transition
+            }, 50);
         }
 
-        // On load, ensure we are in the file upload state.
-        window.onload = function() {
+        /**
+         * Toggles file watching mode
+         */
+        function toggleWatch() {
+            const button = document.getElementById('watchButton');
+            const statusElement = document.getElementById('file-status');
+            
+            if (isWatching) {
+                clearInterval(watchInterval);
+                isWatching = false;
+                button.textContent = 'Watch for New Results';
+                button.className = 'btn btn-success';
+                statusElement.textContent = 'Watching stopped.';
+            } else {
+                isWatching = true;
+                button.textContent = 'Stop Watching';
+                button.className = 'btn btn-danger';
+                statusElement.textContent = 'Watching for new files...';
+                
+                watchInterval = setInterval(async () => {
+                    const ticker = document.getElementById('tickerInput').value.trim().toUpperCase() || 'INTC';
+                    const autoLoadPath = `data/results/model_results_${ticker}.json`;
+                    try {
+                        const response = await fetch(autoLoadPath + '?t=' + Date.now());
+                        if (response.ok) {
+                            const data = await response.json();
+                            statusElement.textContent = `New file detected! Loading ${ticker}...`;
+                            clearInterval(watchInterval);
+                            isWatching = false;
+                            button.textContent = 'Watch for New Results';
+                            button.className = 'btn btn-success';
+                            initializeDashboard(data);
+                        }
+                    } catch (error) {
+                        // File not found yet, keep watching
+                    }
+                }, 3000);
+            }
+        }
+
+        // On load, check for auto-load
+        window.onload = async function() {
             document.getElementById('dashboardContent').style.display = 'none';
             document.getElementById('initial-state').style.display = 'flex';
+            
+            // Try to auto-load if ticker is in URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            const ticker = urlParams.get('ticker');
+            
+            if (ticker) {
+                const autoLoadPath = `data/results/model_results_${ticker.toUpperCase()}.json`;
+                try {
+                    const response = await fetch(autoLoadPath);
+                    if (response.ok) {
+                        const data = await response.json();
+                        document.getElementById('file-status').textContent = `Auto-loaded: ${ticker}`;
+                        initializeDashboard(data);
+                    }
+                } catch (error) {
+                    console.log('No auto-load file found');
+                }
+            }
         };
     </script>
 </body>

@@ -12,13 +12,12 @@ warnings.filterwarnings('ignore')
 
 from datetime import datetime, timedelta
 
-# Assuming these modules are correctly available in your 'src' directory
-from src.config import SEQ_LEN
-from src.data_ingest import download_prices
-from src.features import make_advanced_features, create_labels, build_sequences_with_labels
+from config import SEQ_LEN
+from data_ingest import download_prices
+from features import make_advanced_features, create_labels, build_sequences_with_labels
 from src.models.lstm_model import AdvancedLSTM, CombinedLoss
-from src.backtest import AdvancedBacktest
-from src.ensemble import StackingEnsemble
+from backtest import AdvancedBacktest
+from ensemble import StackingEnsemble
 from src.models.news_model import AdvancedNewsModel
 
 
@@ -560,24 +559,24 @@ def improved_pipeline_with_ensemble(
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-        print(f"✅ Results exported to {output_file}")
-        print("📊 Upload this file to the dashboard to visualize!")
+        print(f"Results exported to {output_file}")
+        print("Upload this file to the dashboard to visualize!")
     
     # 14. Plot results
     print("\nStep 14: Generating plots...")
     backtester.plot_results(bt_results, ticker=ticker)
     
     # Plot training history
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(history['train_loss'], label='Train Loss')
-    ax.plot(history['val_loss'], label='Validation Loss')
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Loss')
-    ax.set_title('Training History')
-    ax.legend()
-    ax.grid(alpha=0.3)
-    plt.tight_layout()
-    plt.show()
+    # fig, ax = plt.subplots(figsize=(10, 5))
+    # ax.plot(history['train_loss'], label='Train Loss')
+    # ax.plot(history['val_loss'], label='Validation Loss')
+    # ax.set_xlabel('Epoch')
+    # ax.set_ylabel('Loss')
+    # ax.set_title('Training History')
+    # ax.legend()
+    # ax.grid(alpha=0.3)
+    # plt.tight_layout()
+    # plt.show()
     
     print("\n" + "="*60)
     print("Pipeline completed successfully!")
@@ -608,12 +607,8 @@ if __name__ == '__main__':
         batch_size=64,
         epochs=150,
         use_ensemble=True, 
-        test_live=False, 
+        test_live=True, 
         enable_shorting=True,
         export_results=True
     )
     
-    print("\n🎉 All done! You can now:")
-    print("  1. Check the plots for visual analysis")
-    print(f"  2. Upload 'model_results_MSFT.json' to the dashboard")
-    print("  3. Review live testing results above")
