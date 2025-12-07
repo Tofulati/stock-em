@@ -568,7 +568,8 @@
                         hideLoading();
                         
                         if (statusData.results) {
-                            initializeDashboard(statusData.results);
+                            const normalizedData = normalizeBacktestData(statusData.results);
+                            initializeDashboard(normalizedData);
                         } else {
                             throw new Error('No results returned from backtest');
                         }
@@ -616,6 +617,50 @@
         }
 
         /**
+         * Normalizes backend response to dashboard format
+         */
+        function normalizeBacktestData(rawData) {
+            console.log('File loaded, attempting normalization...');
+            console.log('Raw data received:', rawData);
+            
+            // Handle nested structure from backend: standard_backtest.{metrics, results}
+            if (rawData.standard_backtest) {
+                const normalizedData = {
+                    ticker: rawData.ticker,
+                    period: rawData.period,
+                    use_ensemble: rawData.use_ensemble,
+                    metrics: rawData.standard_backtest.metrics,
+                    backtest: rawData.standard_backtest.results.map((entry, idx) => {
+                        // Ensure all required fields exist
+                        return {
+                            date: idx,
+                            nav: entry.nav || 0,
+                            signal: entry.signal !== undefined ? entry.signal : 0,
+                            confidence: entry.confidence || 0,
+                            position_value: entry.position_value || 0,
+                            shares: entry.shares || 0
+                        };
+                    })
+                };
+                
+                console.log('Normalized data:', normalizedData);
+                console.log('Sample backtest entry:', normalizedData.backtest[0]);
+                console.log('Normalization successful, initializing dashboard...');
+                
+                return normalizedData;
+            }
+            
+            // Handle direct format: {metrics, backtest}
+            if (rawData.metrics && rawData.backtest) {
+                console.log('Data already in correct format');
+                return rawData;
+            }
+            
+            console.error('Unrecognized data format:', rawData);
+            throw new Error("Unrecognized JSON format. Expected 'standard_backtest' or 'metrics'+'backtest' fields.");
+        }
+
+        /**
          * Parses the uploaded JSON file and initializes the dashboard.
          */
         function handleFileUpload(event) {
@@ -633,12 +678,11 @@
             
             reader.onload = function(e) {
                 try {
-                    const data = JSON.parse(e.target.result);
-                    if (!data.metrics || !data.backtest || !Array.isArray(data.backtest)) {
-                        throw new Error("JSON structure is invalid. Requires 'metrics' and 'backtest' fields.");
-                    }
+                    const rawData = JSON.parse(e.target.result);
+                    const normalizedData = normalizeBacktestData(rawData);
+                    
                     statusElement.textContent = `Successfully loaded ${file.name}. Initializing dashboard...`;
-                    initializeDashboard(data);
+                    initializeDashboard(normalizedData);
                 } catch (error) {
                     console.error("File processing error:", error);
                     statusElement.textContent = `Error: ${error.message}. Please upload a valid JSON file.`;
