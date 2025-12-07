@@ -692,7 +692,7 @@ def improved_pipeline_with_ensemble(
     
     # 14. Plot results
     print("\nStep 14: Generating plots...")
-    backtester.plot_results(bt_results, ticker=ticker)
+    # backtester.plot_results(bt_results, ticker=ticker)
     
     print("\n" + "="*60)
     print("Pipeline completed successfully!")
@@ -726,6 +726,6 @@ if __name__ == '__main__':
         epochs=150,
         use_ensemble=True, 
         test_walk_forward=True, 
-        enable_shorting=False,
+        enable_shorting=True,
         export_results=True
     )

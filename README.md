@@ -12,9 +12,9 @@ This skeleton repository shows a minimal end-to-end pipeline to:
 
 
 Usage (quick):
-1. Create a virtualenv and `pip install -r requirements.txt`.
+1. Create a virtualenv with python=3.12 and `pip install -r requirements.txt`.
 2. Configure `DATA_DIR` and (optionally) NEWS_API_KEY in `src/config.py`.
-3. Run `python -m src.toy_run` to run the toy pipeline using yfinance and simulated news.
+3. Run `python launcher.py` to run the toy pipeline using yfinance and simulated news.
 
 
 Notes:
